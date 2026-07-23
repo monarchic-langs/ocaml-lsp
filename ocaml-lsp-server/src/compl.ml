@@ -97,6 +97,12 @@ module For_tests = struct
   let sortText_of_index = sortText_of_index
 end
 
+let reindex_sortText completion_items =
+  List.mapi completion_items ~f:(fun idx (ci : CompletionItem.t) ->
+    let sortText = Some (sortText_of_index idx) in
+    { ci with sortText })
+;;
+
 module Complete_by_prefix = struct
   let completionItem_of_completion_entry
         idx
@@ -211,6 +217,7 @@ module Complete_by_prefix = struct
     in
     keyword_completionItems
     @ process_dispatch_resp ~deprecated ~resolve ~prefix doc pos completion
+    |> reindex_sortText
   ;;
 end
 
@@ -325,11 +332,6 @@ let complete
            if not (Merlin_analysis.Typed_hole.can_be_hole prefix)
            then Complete_by_prefix.complete merlin prefix pos ~resolve ~deprecated
            else (
-             let reindex_sortText completion_items =
-               List.mapi completion_items ~f:(fun idx (ci : CompletionItem.t) ->
-                 let sortText = Some (sortText_of_index idx) in
-                 { ci with sortText })
-             in
              let preselect_first =
                match
                  let open Option.O in
