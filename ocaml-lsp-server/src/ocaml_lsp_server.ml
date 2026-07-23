@@ -683,6 +683,7 @@ let on_request
             | `Other -> Fiber.return ci
             | `Merlin doc ->
               Compl.resolve
+                ~position_encoding:(State.position_encoding state)
                 doc
                 ci
                 resolve

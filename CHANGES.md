@@ -35,6 +35,7 @@
 - Respect the client's preferred completion documentation format. (#1885, @rgrinberg)
 - Parse non-ASCII completion prefixes and whitespace in CRLF input. (#1886, @rgrinberg)
 - Preserve dotted operators in completion prefixes and resolve requests. (#1890, @rgrinberg)
+- Respect the negotiated position encoding in completion requests and edit ranges. (#1889, @rgrinberg)
 - Correct code-action ranges after multiline text insertions. (#1748, @rgrinberg)
 - Allow clients to add their first workspace folder dynamically. (#1747, @rgrinberg)
 - Unregister Dune promotion commands after their diagnostics are cleared. (#1746, @rgrinberg)
