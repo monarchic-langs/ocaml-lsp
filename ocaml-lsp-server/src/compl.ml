@@ -91,10 +91,16 @@ let range_prefix (lsp_position : Position.t) prefix : Range.t =
   { Range.start; end_ = lsp_position }
 ;;
 
-let sortText_of_index idx = Printf.sprintf "%04d" idx
+let sortText_width item_count =
+  max 4 (String.length (Int.to_string (max 0 (item_count - 1))))
+;;
+
+let sortText_of_index ~width idx = Printf.sprintf "%0*d" width idx
 
 module For_tests = struct
-  let sortText_of_index = sortText_of_index
+  let sortText_of_index ~item_count idx =
+    sortText_of_index ~width:(sortText_width item_count) idx
+  ;;
 end
 
 module Complete_by_prefix = struct
@@ -104,6 +110,7 @@ module Complete_by_prefix = struct
         ~compl_params
         ~range
         ~deprecated
+        ~sort_text_width
     =
     let kind = completion_kind entry.kind in
     let textEdit = `TextEdit { TextEdit.range; newText = entry.name } in
@@ -114,7 +121,7 @@ module Complete_by_prefix = struct
       ?deprecated:(Option.some_if deprecated entry.deprecated)
         (* Without this field the client is not forced to respect the order
            provided by merlin. *)
-      ~sortText:(sortText_of_index idx)
+      ~sortText:(sortText_of_index ~width:sort_text_width idx)
       ?data:compl_params
       ~textEdit
       ()
@@ -172,9 +179,15 @@ module Complete_by_prefix = struct
            CompletionParams.create ~textDocument ~position:pos ()
            |> CompletionParams.yojson_of_t)
     in
+    let sort_text_width = sortText_width (List.length completion_entries) in
     List.mapi
       completion_entries
-      ~f:(completionItem_of_completion_entry ~deprecated ~range ~compl_params)
+      ~f:
+        (completionItem_of_completion_entry
+           ~deprecated
+           ~range
+           ~compl_params
+           ~sort_text_width)
   ;;
 
   let complete_keywords completion_position prefix =
@@ -230,6 +243,7 @@ module Complete_with_construct = struct
     | None -> []
     | Some (loc, constructed_exprs) ->
       let range = Range.of_loc loc in
+      let sort_text_width = sortText_width (List.length constructed_exprs) in
       let deparen_constr_expr expr =
         if
           (not (String.equal expr "()"))
@@ -259,7 +273,7 @@ module Complete_with_construct = struct
           ~textEdit:(`TextEdit edit)
           ~filterText:("_" ^ expr)
           ~kind:CompletionItemKind.Text
-          ~sortText:(sortText_of_index idx)
+          ~sortText:(sortText_of_index ~width:sort_text_width idx)
           ?command
           ()
       in
@@ -326,8 +340,9 @@ let complete
            then Complete_by_prefix.complete merlin prefix pos ~resolve ~deprecated
            else (
              let reindex_sortText completion_items =
+               let width = sortText_width (List.length completion_items) in
                List.mapi completion_items ~f:(fun idx (ci : CompletionItem.t) ->
-                 let sortText = Some (sortText_of_index idx) in
+                 let sortText = Some (sortText_of_index ~width idx) in
                  { ci with sortText })
              in
              let preselect_first =
