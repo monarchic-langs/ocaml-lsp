@@ -19,6 +19,8 @@
   requests. (#1856, @rgrinberg)
 - Advertise semantic-token delta support only to clients that request it.
   (#1859, @rgrinberg)
+- Advertise and encode only semantic token types supported by the client.
+  (#1860, @rgrinberg)
 - Replace a lone polymorphic-variant backtick when applying completions.
   (#1823, fixes #1427, @rgrinberg)
 - Advertise all code-action kinds that the server may return. (#1803, @rgrinberg)
