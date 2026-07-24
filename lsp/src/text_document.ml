@@ -120,14 +120,27 @@ let apply_text_document_edits t (edits : TextEdit.t list) =
   { t with text = Some text; zipper }
 ;;
 
-let absolute_position t pos =
+let offset t pos =
   String_zipper.goto_position t.zipper pos t.position_encoding |> String_zipper.offset
 ;;
 
-let absolute_range t (range : Range.t) =
+let offsets t (range : Range.t) =
   let zipper = String_zipper.goto_position t.zipper range.start t.position_encoding in
   let start = String_zipper.offset zipper in
   let zipper = String_zipper.goto_position zipper range.end_ t.position_encoding in
   let stop = String_zipper.offset zipper in
   start, stop
 ;;
+
+let position t ~offset = String_zipper.position t.zipper ~offset t.position_encoding
+
+let range t ~start_offset_inclusive ~end_offset_exclusive =
+  String_zipper.range
+    t.zipper
+    ~start_offset_inclusive
+    ~end_offset_exclusive
+    t.position_encoding
+;;
+
+let absolute_position = offset
+let absolute_range = offsets

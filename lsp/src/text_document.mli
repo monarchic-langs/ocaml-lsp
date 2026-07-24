@@ -33,12 +33,28 @@ val set_version : t -> version:int -> t
     interpreted relative to the original document. *)
 val apply_text_document_edits : t -> TextEdit.t list -> t
 
-(** [absolute_position t pos] returns the absolute position of [pos] inside
-    [text t]. If the position is outside the bounds of the document, the offset
-    returned will be the length of the document. [pos] is interpreted with
-    [position_encoding t] *)
+(** [offset t position] returns the UTF-8 byte offset of [position] in [text t].
+    If [position] is outside the document, the result is clamped to the end of
+    the corresponding line or document. [position] is interpreted using
+    [position_encoding t]. *)
+val offset : t -> Position.t -> int
+
+(** [offsets t range] is equivalent to
+    [(offset t range.start, offset t range.end_)] but may be faster. *)
+val offsets : t -> Range.t -> int * int
+
+(** [position t ~offset] returns the position at the UTF-8 byte [offset] in
+    [text t], using [position_encoding t]. Offsets outside the document are
+    clamped to its bounds. *)
+val position : t -> offset:int -> Position.t
+
+(** [range t ~start_offset_inclusive ~end_offset_exclusive] converts a range of
+    UTF-8 byte offsets to positions using [position_encoding t]. Offsets outside
+    the document are clamped to its bounds. *)
+val range : t -> start_offset_inclusive:int -> end_offset_exclusive:int -> Range.t
+
+(** Compatibility alias for {!offset}. *)
 val absolute_position : t -> Position.t -> int
 
-(* [absolute_range t range] same as [(absolute_position t range.start ,
-   absolute_position t range.end_)] but possibly faster *)
+(** Compatibility alias for {!offsets}. *)
 val absolute_range : t -> Range.t -> int * int

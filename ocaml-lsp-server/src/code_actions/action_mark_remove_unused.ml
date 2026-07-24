@@ -259,21 +259,12 @@ let rec_regex =
 ;;
 
 let find_preceding doc pos regex =
+  let text_document = Document.text_document doc in
+  let end_ = Text_document.offset text_document pos in
   let open Option.O in
-  let src = Document.source doc in
-  let (`Offset end_) = Msource.get_offset src @@ Position.logical pos in
-  let* groups = Re.exec_opt ~len:end_ regex (Msource.text src) in
-  let match_start, match_end = Re.Group.offset groups 1 in
-  let filename = Uri.to_path (Document.uri doc) in
-  let* start =
-    Msource.get_lexing_pos ~filename src (`Offset match_start)
-    |> Position.of_lexical_position
-  in
-  let+ end_ =
-    Msource.get_lexing_pos ~filename src (`Offset match_end)
-    |> Position.of_lexical_position
-  in
-  Range.create ~start ~end_
+  let+ groups = Re.exec_opt ~len:end_ regex (Text_document.text text_document) in
+  let start_offset_inclusive, end_offset_exclusive = Re.Group.offset groups 1 in
+  Text_document.range text_document ~start_offset_inclusive ~end_offset_exclusive
 ;;
 
 let action_remove_rec doc (d : Diagnostic.t) =
