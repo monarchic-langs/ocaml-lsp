@@ -1,11 +1,12 @@
 open Import
 
 (** This code action allows the user to invoke Merlin-destruct to enumerate
-    cases from various lines of a partial match statement. If the line is of any
-    of these forms: [match x] [match x with] [| x -> y] then the pre-processing
-    will extract [x] and invoke Merlin-destruct on it. Some post-processing is
-    applied to Merlin's response to make it more useful for adding subsequent
-    code: extraneous tokens are stripped and cases are split across lines. For
+    cases from various lines of a partial match statement. If a line contains
+    one of these forms: [match x] [match x with] [| x -> y] then the
+    pre-processing will extract [x] and invoke Merlin-destruct on it. Existing
+    cases are reused when the action is requested on [match]. Merlin's response
+    is post-processed to make it more useful for adding subsequent code:
+    extraneous tokens are stripped and cases are split across lines. For
     example, supposing [x] is a [bool], then the line [match x with] expands to
     [match x with
      | false -> _

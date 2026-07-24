@@ -165,21 +165,47 @@ let adjust_reply_location ~(statement : destructable_statement) (loc : Loc.t) : 
   { loc with loc_start; loc_end }
 ;;
 
+let statement_of_code ~prefix_len code range =
+  let code =
+    Stdlib.String.make prefix_len ' ' ^ Base.String.drop_prefix code prefix_len
+  in
+  match get_statement_kind code range with
+  | None -> None
+  | Some kind ->
+    let query_range = get_query_range code kind range in
+    let reply_range = get_reply_range code kind query_range in
+    Some { code; kind; query_range; reply_range }
+;;
+
+let statement_at_offset doc source offset =
+  let (`Logical (line, character)) = Msource.get_logical source (`Offset offset) in
+  let position = Position.create ~line:(line - 1) ~character in
+  let range = Range.create ~start:position ~end_:position in
+  statement_of_code ~prefix_len:character (get_line doc range) range
+;;
+
 (** Tries to find a statement we know how to handle on the line where the range
-    starts. *)
+    starts. Inline matches are focused by masking their prefix, preserving all
+    character offsets used by the existing line-oriented processing. *)
 let extract_statement (doc : Document.t) (ca_range : Range.t)
   : destructable_statement option
   =
-  if ca_range.start.line <> ca_range.end_.line
-  then None
-  else (
-    let code = get_line doc ca_range in
-    match get_statement_kind code ca_range with
-    | None -> None
-    | Some kind ->
-      let query_range = get_query_range code kind ca_range in
-      let reply_range = get_reply_range code kind query_range in
-      Some { code; kind; query_range; reply_range })
+  let multiline = ca_range.start.line <> ca_range.end_.line in
+  let line_range : Range.t =
+    if multiline then { start = ca_range.start; end_ = ca_range.start } else ca_range
+  in
+  let code = get_line doc line_range in
+  let source = Document.source doc in
+  let (`Offset line_start) =
+    Msource.get_offset source (`Logical (line_range.start.line + 1, 0))
+  in
+  let search_code = Base.String.drop_prefix (Document.text doc) line_start in
+  match Destruct_line_search.find search_code ~position:line_range.start.character with
+  | None -> if multiline then None else statement_of_code ~prefix_len:0 code line_range
+  | Some { case_start = Some case_start; _ } ->
+    statement_at_offset doc source (line_start + case_start)
+  | Some { match_start; case_start = None } ->
+    statement_of_code ~prefix_len:match_start code line_range
 ;;
 
 (** Strips " -> _ " off the rhs and " | " off the lhs of a case-line if present. *)
