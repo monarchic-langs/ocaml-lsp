@@ -16,8 +16,9 @@
    (package ocaml-lsp-server)))
  (libraries
   unix
-  stdune
+  ordering
   fiber
+  fs-io
   yojson
   re
   ppx_yojson_conv_lib

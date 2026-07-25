@@ -3,6 +3,9 @@ open Fiber.O
 open Lev_fiber_util
 module Timestamp = Lev.Timestamp
 
+let inspect_exn_with_backtrace { Exn_with_backtrace.exn; backtrace } ~f =
+  f exn backtrace
+
 module Signal_watcher = struct
   type t = {
     thread : Thread.t;

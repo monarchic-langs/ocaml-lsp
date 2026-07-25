@@ -914,9 +914,11 @@ let start stream =
       Fiber.map_reduce_errors
         (module Monoid.Unit)
         f
-        ~on_error:(fun exn ->
-          Format.eprintf "%s: %a@." what Exn_with_backtrace.pp_uncaught exn;
-          Fiber.return ())
+        ~on_error:(fun error ->
+          Lev_fiber.inspect_exn_with_backtrace error ~f:(fun exn backtrace ->
+            let exn = { Exn_with_backtrace.exn; backtrace } in
+            Format.eprintf "%s: %a@." what Exn_with_backtrace.pp_uncaught exn;
+            Fiber.return ()))
     in
     ()
   in

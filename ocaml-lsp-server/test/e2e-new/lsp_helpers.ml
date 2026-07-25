@@ -88,10 +88,13 @@ let iter_lsp_response_result ?prep ?path ~language_id ~makeRequest ~source k =
     | Ok response ->
       k (Ok response);
       Fiber.return ()
-    | Error [ { Exn_with_backtrace.exn = Jsonrpc.Response.Error.E error; backtrace = _ } ]
-      ->
-      k (Error error);
-      Fiber.return ()
+    | Error [ error ] ->
+      Test.inspect_error error ~f:(fun exn _ ->
+        match exn with
+        | Jsonrpc.Response.Error.E error ->
+          k (Error error);
+          Fiber.return ()
+        | _ -> Fiber.reraise_all [ error ])
     | Error errors -> Fiber.reraise_all errors)
 ;;
 

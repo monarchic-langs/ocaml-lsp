@@ -3,7 +3,7 @@ open Import
 let ocamllsp_source = "ocamllsp"
 let dune_source = "dune"
 
-module Id = struct
+module Diagnostic_id = struct
   include Drpc.Diagnostic.Id
 
   let compare_ordering = compare
@@ -12,7 +12,7 @@ module Id = struct
 end
 
 module Dune = struct
-  module Id = Stdune.Id.Make ()
+  module Id = Id.Make ()
 
   module T = struct
     type t =
@@ -208,7 +208,8 @@ let set t what =
   | `Merlin (uri, diagnostics) -> Table.set t.merlin ~key:uri ~data:diagnostics
   | `Dune (dune, id, uri, diagnostics) ->
     let dune_table =
-      Table.find_or_add t.dune dune ~default:(fun _ -> Table.create (module Id))
+      Table.find_or_add t.dune dune ~default:(fun _ ->
+        Table.create (module Diagnostic_id))
     in
     Table.set dune_table ~key:id ~data:(uri, diagnostics)
 ;;

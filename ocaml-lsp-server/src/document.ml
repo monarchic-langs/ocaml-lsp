@@ -106,7 +106,9 @@ let await task =
   let without_cancellation res =
     match res with
     | Ok s -> Ok s
-    | Error (`Exn exn) -> Error exn
+    | Error (`Exn error) ->
+      Lev_fiber.inspect_exn_with_backtrace error ~f:(fun exn backtrace ->
+        Error { Exn_with_backtrace.exn; backtrace })
     | Error `Cancelled ->
       let exn = Failure "unexpected cancellation" in
       let backtrace = Printexc.get_callstack 10 in

@@ -31,7 +31,7 @@
   odoc_parser
   ppx_yojson_conv_lib
   re
-  stdune
+  pp
   ordering
   csexp
   sexplib0

@@ -1,5 +1,12 @@
 open Stdune
 
+(** Destructure Fiber's backtrace-carrying exception without requiring callers
+    to depend directly on Stdune's record type. *)
+val inspect_exn_with_backtrace
+  :  Exn_with_backtrace.t
+  -> f:(exn -> Printexc.raw_backtrace -> 'a)
+  -> 'a
+
 module Timer : sig
   val sleepf : float -> unit Fiber.t
   (** [sleep f] wait for [f] seconds  *)

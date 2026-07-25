@@ -13,10 +13,13 @@ let%expect_test "unsupported standard requests are reported as unavailable" =
    in
    let* () =
      match response with
-     | Error
-         [ { Exn_with_backtrace.exn = Jsonrpc.Response.Error.E error; backtrace = _ } ] ->
-       Jsonrpc.Response.Error.yojson_of_t error |> Test.print_result;
-       Fiber.return ()
+     | Error [ error ] ->
+       Test.inspect_error error ~f:(fun exn _ ->
+         match exn with
+         | Jsonrpc.Response.Error.E error ->
+           Jsonrpc.Response.Error.yojson_of_t error |> Test.print_result;
+           Fiber.return ()
+         | _ -> Fiber.reraise_all [ error ])
      | Error errors -> Fiber.reraise_all errors
      | Ok _ -> failwith "unsupported request unexpectedly succeeded"
    in

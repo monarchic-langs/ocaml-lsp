@@ -22,7 +22,7 @@ let tokens encoded_tokens =
 ;;
 
 let single_line_non_overlapping_violations ~source ~encoded_tokens =
-  if Array.length encoded_tokens mod 5 <> 0
+  if Int.rem (Array.length encoded_tokens) 5 <> 0
   then [ "encoded token array length is not divisible by five" ]
   else (
     let line_lengths =

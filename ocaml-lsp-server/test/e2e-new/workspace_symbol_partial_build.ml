@@ -114,7 +114,7 @@ let%expect_test "generated source has an existing workspace-symbol location" =
      | Some symbol ->
        let path = DocumentUri.to_path symbol.location.uri in
        Printf.printf "path: %s\n" (relative_path ~root:workspace.path path);
-       let contents = Io.String_path.read_file path in
+       let contents = Fs_io.read_file path |> Result.ok_exn in
        Printf.printf "contents: %s\n" (Yojson.Safe.to_string (`String contents)));
     Fiber.return ());
   [%expect

@@ -1,5 +1,23 @@
-open Stdune
 module Cli = Lsp.Cli
+
+let pp_uncaught formatter (exn, backtrace) =
+  let message =
+    Printf.sprintf
+      "%s\n%s"
+      (Printexc.to_string exn)
+      (Printexc.raw_backtrace_to_string backtrace)
+    |> String.split_on_char '\n'
+    |> List.map (Printf.sprintf "| %s")
+    |> String.concat "\n"
+  in
+  let line = String.make 71 '-' in
+  Format.fprintf
+    formatter
+    "/%s\n| @{<error>Internal error@}: Uncaught exception.\n%s\n\\%s@."
+    line
+    message
+    line
+;;
 
 let () =
   Printexc.record_backtrace true;
@@ -36,14 +54,11 @@ let () =
   then (
     let version = Ocaml_lsp_server.Version.get () in
     print_endline version)
-  else
-    let module Exn_with_backtrace = Stdune.Exn_with_backtrace in
-    match
-      Exn_with_backtrace.try_with
-        (Ocaml_lsp_server.run channel ~prefer_dot_merlin:!prefer_dot_merlin)
-    with
-    | Ok () -> ()
-    | Error exn ->
-      Format.eprintf "%a@." Exn_with_backtrace.pp_uncaught exn;
-      exit 1
+  else (
+    match (Ocaml_lsp_server.run channel ~prefer_dot_merlin:!prefer_dot_merlin) () with
+    | () -> ()
+    | exception exn ->
+      let backtrace = Printexc.get_raw_backtrace () in
+      Format.eprintf "%a@." pp_uncaught (exn, backtrace);
+      exit 1)
 ;;

@@ -19,11 +19,7 @@ module Code_action_error = struct
   ;;
 end
 
-module Code_action_error_monoid = struct
-  type t = Code_action_error.t
-
-  include Stdune.Monoid.Make (Code_action_error)
-end
+module Code_action_error_monoid = Monoid.Make (Code_action_error)
 
 let compute_ocaml_code_actions (params : CodeActionParams.t) state doc =
   let action_is_enabled =
@@ -74,11 +70,13 @@ let compute_ocaml_code_actions (params : CodeActionParams.t) state doc =
   let code_action ca =
     let+ res =
       Fiber.map_reduce_errors
-        ~on_error:(fun (exn : Exn_with_backtrace.t) ->
-          match exn.exn with
-          | Merlin_extend.Extend_main.Handshake.Error error ->
-            Fiber.return (Code_action_error.Need_merlin_extend error)
-          | _ -> Fiber.return (Code_action_error.Exn exn))
+        ~on_error:(fun error ->
+          Lev_fiber.inspect_exn_with_backtrace error ~f:(fun exn backtrace ->
+            match exn with
+            | Merlin_extend.Extend_main.Handshake.Error error ->
+              Fiber.return (Code_action_error.Need_merlin_extend error)
+            | exn ->
+              Fiber.return (Code_action_error.Exn { Exn_with_backtrace.exn; backtrace })))
         (module Code_action_error_monoid)
         (fun () -> ca doc params)
     in

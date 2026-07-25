@@ -1,3 +1,4 @@
+module Dune_ordering = Ordering
 open Base
 open Base_quickcheck
 module Position = Ocaml_lsp_server.Testing.Position
@@ -21,7 +22,11 @@ let range start_selector end_selector =
 ;;
 
 let ordering integer =
-  if integer < 0 then Stdune.Lt else if integer = 0 then Stdune.Eq else Stdune.Gt
+  if integer < 0
+  then Dune_ordering.Lt
+  else if integer = 0
+  then Dune_ordering.Eq
+  else Dune_ordering.Gt
 ;;
 
 let check label condition = if not condition then failwith label

@@ -10,10 +10,40 @@ let sprintf = Printf.sprintf
 
 module Map = Stdlib.MoreLabels.Map
 
-include struct
-  open Stdune
-  module Exn_with_backtrace = Exn_with_backtrace
-  module Monoid = Monoid
+module Monoid = struct
+  module Make (M : sig
+      type t
+
+      val empty : t
+      val combine : t -> t -> t
+    end) =
+  struct
+    include M
+
+    module O = struct
+      let ( @ ) = combine
+    end
+
+    let reduce = List.fold_left combine empty
+    let map_reduce ~f = List.fold_left (fun acc value -> combine acc (f value)) empty
+  end
+
+  module List (T : sig
+      type t
+    end) =
+  Make (struct
+      type t = T.t list
+
+      let empty = []
+      let combine = ( @ )
+    end)
+
+  module Unit = Make (struct
+      type t = unit
+
+      let empty = ()
+      let combine () () = ()
+    end)
 end
 
 module Int = struct

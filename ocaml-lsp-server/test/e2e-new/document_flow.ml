@@ -125,16 +125,18 @@ let%expect_test "missing dune leaves an opened document unavailable (#1417)" =
    in
    let* () =
      match result with
-     | Error
-         [ { Exn_with_backtrace.exn =
-               Jsonrpc.Response.Error.E
-                 { code = Jsonrpc.Response.Error.Code.InvalidRequest; message; data = _ }
-           ; backtrace = _
-           }
-         ] ->
-       String.replace_all message ~sub:(DocumentUri.to_string uri) ~by:"<document-uri>"
-       |> print_endline;
-       Fiber.return ()
+     | Error [ error ] ->
+       Test.inspect_error error ~f:(fun exn _ ->
+         match exn with
+         | Jsonrpc.Response.Error.E
+             { code = Jsonrpc.Response.Error.Code.InvalidRequest; message; data = _ } ->
+           String.replace_all
+             message
+             ~sub:(DocumentUri.to_string uri)
+             ~by:"<document-uri>"
+           |> print_endline;
+           Fiber.return ()
+         | _ -> Fiber.reraise_all [ error ])
      | Error errors -> Fiber.reraise_all errors
      | Ok _ ->
        print_endline "hover succeeded";

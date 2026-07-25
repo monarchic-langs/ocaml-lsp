@@ -385,5 +385,6 @@ let run (state : State.t) (params : WorkspaceSymbolParams.t) =
      | Ok (Ok symbols) -> Fiber.return (Some symbols)
      | Ok (Error `Cancelled) -> assert false
      | Error `Cancelled -> assert false
-     | Error (`Exn exn) -> Exn_with_backtrace.reraise exn)
+     | Error (`Exn error) ->
+       Lev_fiber.inspect_exn_with_backtrace error ~f:Printexc.raise_with_backtrace)
 ;;

@@ -84,7 +84,9 @@ module Client =
         let+ res = Fiber.collect_errors f in
         Result.map_error
           res
-          ~f:(List.map ~f:(fun (exn : Exn_with_backtrace.t) -> exn.exn))
+          ~f:
+            (List.map ~f:(fun error ->
+               Lev_fiber.inspect_exn_with_backtrace error ~f:(fun exn _ -> exn)))
       ;;
     end)
     (Chan)
@@ -141,7 +143,7 @@ module Instance : sig
   val promotions : t -> Drpc.Diagnostic.Promotion.t String.Map.t
   val client : t -> Client.t option
 end = struct
-  module Id = Stdune.Id.Make ()
+  module Id = Id.Make ()
 
   type running =
     { chan : Chan.t
@@ -404,12 +406,11 @@ end = struct
       Fiber.map_reduce_errors
         (module Monoid.List (Exn_with_backtrace))
         (fun () -> Lev_fiber_csexp.connect sock sockaddr)
-        ~on_error:(fun exn ->
-          match exn with
-          | { Exn_with_backtrace.exn = Unix.Unix_error ((ECONNREFUSED | ENOENT), _, _)
-            ; _
-            } -> Fiber.return []
-          | _ -> Fiber.return [ exn ])
+        ~on_error:(fun error ->
+          Lev_fiber.inspect_exn_with_backtrace error ~f:(fun exn backtrace ->
+            match exn with
+            | Unix.Unix_error ((ECONNREFUSED | ENOENT), _, _) -> Fiber.return []
+            | exn -> Fiber.return [ { Exn_with_backtrace.exn; backtrace } ]))
     in
     match session with
     | Error exns ->
@@ -723,16 +724,18 @@ let poll active last_error =
             Fiber.map_reduce_errors
               (module Monoid.Unit)
               (fun () -> Instance.run instance)
-              ~on_error:(fun exn ->
-                let message =
-                  Format.asprintf
-                    "disconnected %s:@.%a"
-                    (Registry.Dune.root (Instance.source instance))
-                    Exn_with_backtrace.pp_uncaught
-                    exn
-                in
-                let* () = active.config.log ~type_:Error ~message in
-                Lazy_fiber.force cleanup)
+              ~on_error:(fun error ->
+                Lev_fiber.inspect_exn_with_backtrace error ~f:(fun exn backtrace ->
+                  let exn = { Exn_with_backtrace.exn; backtrace } in
+                  let message =
+                    Format.asprintf
+                      "disconnected %s:@.%a"
+                      (Registry.Dune.root (Instance.source instance))
+                      Exn_with_backtrace.pp_uncaught
+                      exn
+                  in
+                  let* () = active.config.log ~type_:Error ~message in
+                  Lazy_fiber.force cleanup))
           in
           Lazy_fiber.force cleanup)
     in
