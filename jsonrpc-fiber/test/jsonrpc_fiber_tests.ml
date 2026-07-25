@@ -464,7 +464,7 @@ let%expect_test "test from jsonrpc_test.ml" =
     { "id": "testing", "jsonrpc": "2.0", "result": 2 } |}]
 ;;
 
-let%expect_test "a response received before send returns races with cancellation" =
+let%expect_test "a response received before send returns is not dropped" =
   let response_read = Fiber.Ivar.create () in
   let send_returned = Fiber.Ivar.create () in
   let client_input, server_output = pipe () in
@@ -523,8 +523,10 @@ let%expect_test "a response received before send returns races with cancellation
       ]
   in
   Fiber_test.test Dyn.opaque run;
-  [%expect.unreachable]
-[@@expect.uncaught_exn {| (Failure Fiber.Ivar.fill) |}]
+  [%expect
+    {|
+    response: immediate
+    <opaque> |}]
 ;;
 
 let%expect_test "request IDs may be retried after send errors" =
@@ -562,7 +564,7 @@ let%expect_test "request IDs may be retried after send errors" =
     <opaque> |}]
 ;;
 
-let%expect_test "duplicate request IDs are sent before rejection" =
+let%expect_test "duplicate request IDs are rejected before sending" =
   let first_sent = Fiber.Ivar.create () in
   let sent = ref [] in
   let incoming, incoming_writer = pipe () in
@@ -609,10 +611,7 @@ let%expect_test "duplicate request IDs are sent before rejection" =
     first: rejected
     duplicate: rejected
     wire packets:
-    [
-      { "id": 1, "method": "duplicate", "jsonrpc": "2.0" },
-      { "id": 1, "method": "duplicate", "jsonrpc": "2.0" }
-    ]
+    [ { "id": 1, "method": "duplicate", "jsonrpc": "2.0" } ]
     <opaque> |}]
 ;;
 
@@ -707,7 +706,7 @@ let%expect_test "stopping a session wakes pending requests" =
     <opaque> |}]
 ;;
 
-let%expect_test "cancelling before a request starts still sends it" =
+let%expect_test "cancelling before a request starts does not send it" =
   let incoming, incoming_writer = pipe () in
   let sent = ref [] in
   let session = Jrpc.create ~name:"client" (incoming, of_ref sent) () in
@@ -730,11 +729,11 @@ let%expect_test "cancelling before a request starts still sends it" =
     {|
     cancelled
     wire packets:
-    [ { "id": 1, "method": "cancel", "jsonrpc": "2.0" } ]
+    []
     <opaque> |}]
 ;;
 
-let%expect_test "cancelled request IDs remain registered" =
+let%expect_test "cancelled request IDs can be reused" =
   let request_sent = Fiber.Mvar.create () in
   let incoming, incoming_writer = pipe () in
   let output : Jsonrpc.Packet.t Out.t =
@@ -773,7 +772,7 @@ let%expect_test "cancelled request IDs remain registered" =
   [%expect
     {|
     first: cancelled
-    second: duplicate ID retained
+    second: cancelled
     <opaque> |}]
 ;;
 
