@@ -306,9 +306,9 @@ let on_initialize server (ip : InitializeParams.t) =
         progress
         state.store
         ~log:(State.log_msg server)
+        ~trace:(State.log_trace server)
     in
-    let+ () = Fiber.Pool.task state.detached ~f:(fun () -> Dune.run dune) in
-    dune
+    Fiber.return dune
   in
   let initialize_info = initialize_info ip.capabilities in
   let state =
@@ -325,7 +325,12 @@ let on_initialize server (ip : InitializeParams.t) =
     | None -> state
     | Some trace -> { state with trace }
   in
-  Reply.now initialize_info, state
+  let response =
+    Reply.later (fun send ->
+      let* () = send initialize_info in
+      task_if_running state.detached ~f:(fun () -> Dune.run dune))
+  in
+  response, state
 ;;
 
 module Formatter = struct

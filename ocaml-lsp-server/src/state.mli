@@ -72,3 +72,9 @@ val experimental_client_capabilities : t -> Client.Experimental_capabilities.t
 
 val diagnostics : t -> Diagnostics.t
 val log_msg : t Server.t -> type_:MessageType.t -> message:string -> unit Fiber.t
+
+val log_trace
+  :  t Server.t
+  -> message:(unit -> string)
+  -> verbose:(unit -> string)
+  -> unit Fiber.t
