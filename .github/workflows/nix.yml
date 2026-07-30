@@ -1,7 +1,6 @@
 name: Nix
 
 on:
-  pull_request:
   push:
     branches:
       - master
@@ -9,7 +8,7 @@ on:
 
 jobs:
   tests:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CI_RUNNER_LABELS) }}
     steps:
       - name: Checkout tree
         uses: actions/checkout@v7
@@ -22,7 +21,7 @@ jobs:
       - run: nix develop .#check --command make nix-tests
 
   fmt:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CI_RUNNER_LABELS) }}
     steps:
       - name: Checkout tree
         uses: actions/checkout@v7

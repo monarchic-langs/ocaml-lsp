@@ -8,198 +8,247 @@
     };
   };
 
-  outputs = { self, flake-utils, nixpkgs, ... }@inputs:
-    let
-      package = "ocaml-lsp-server";
-      ocamlformat = pkgs: pkgs.ocamlformat_0_29_0;
-      basePackage = {
-        duneVersion = "3";
-        version = "n/a";
-        src = ./.;
-        doCheck = true;
-      };
-      overlay = merlin: final: prev: {
-        ocaml-lsp = prev.ocaml-lsp.overrideAttrs (_: {
-          # Do not add share/nix-support, so that dependencies from
-          # the scope don't leak into dependent derivations
-          doNixSupport = false;
+  outputs = {
+    self,
+    flake-utils,
+    nixpkgs,
+    ...
+  } @ inputs: let
+    package = "ocaml-lsp-server";
+    ocamlformat = pkgs: pkgs.ocamlformat_0_29_0;
+    basePackage = {
+      duneVersion = "3";
+      version = "n/a";
+      src = ./.;
+      doCheck = true;
+    };
+    overlay = merlin: final: prev: {
+      ocaml-lsp = prev.ocaml-lsp.overrideAttrs (_: {
+        # Do not add share/nix-support, so that dependencies from
+        # the scope don't leak into dependent derivations
+        doNixSupport = false;
+      });
+      dune-release =
+        prev.dune-release.overrideAttrs (_: {doCheck = false;});
+      ocamlPackages = prev.ocamlPackages.overrideScope (oself: osuper: let
+        fixPreBuild = o: {
+          propagatedBuildInputs = o.propagatedBuildInputs ++ [oself.pp];
+          preBuild = ''
+            rm -rf vendor/csexp vendor/pp
+          '';
+        };
+      in {
+        # TODO remove these hacks eventually
+        dyn = osuper.dyn.overrideAttrs fixPreBuild;
+        dune-private-libs =
+          osuper.dune-private-libs.overrideAttrs fixPreBuild;
+        dune-glob = osuper.dune-glob.overrideAttrs fixPreBuild;
+        dune-action-plugin =
+          osuper.dune-action-plugin.overrideAttrs fixPreBuild;
+        dune-rpc = osuper.dune-rpc.overrideAttrs fixPreBuild;
+        stdune = osuper.stdune.overrideAttrs fixPreBuild;
+        merlin-lib = osuper.merlin-lib.overrideAttrs (o: {src = merlin;});
+      });
+    };
+    makeLocalPackages = pkgs: let
+      buildDunePackage = pkgs.ocamlPackages.buildDunePackage;
+    in rec {
+      jsonrpc = buildDunePackage (basePackage
+        // {
+          pname = "jsonrpc";
+          doCheck = false;
+          propagatedBuildInputs = with pkgs.ocamlPackages; [yojson];
         });
-        dune-release =
-          prev.dune-release.overrideAttrs (_: { doCheck = false; });
-        ocamlPackages = prev.ocamlPackages.overrideScope (oself: osuper:
-          let
-            fixPreBuild = o: {
-              propagatedBuildInputs = o.propagatedBuildInputs ++ [ oself.pp ];
-              preBuild = ''
-                rm -rf vendor/csexp vendor/pp
-              '';
-            };
-          in {
-            # TODO remove these hacks eventually
-            dyn = osuper.dyn.overrideAttrs fixPreBuild;
-            dune-private-libs =
-              osuper.dune-private-libs.overrideAttrs fixPreBuild;
-            dune-glob = osuper.dune-glob.overrideAttrs fixPreBuild;
-            dune-action-plugin =
-              osuper.dune-action-plugin.overrideAttrs fixPreBuild;
-            dune-rpc = osuper.dune-rpc.overrideAttrs fixPreBuild;
-            stdune = osuper.stdune.overrideAttrs fixPreBuild;
-            merlin-lib = osuper.merlin-lib.overrideAttrs (o: { src = merlin; });
-          });
-      };
-      makeLocalPackages = pkgs:
-        let buildDunePackage = pkgs.ocamlPackages.buildDunePackage;
-        in rec {
-          jsonrpc = buildDunePackage (basePackage // {
-            pname = "jsonrpc";
-            doCheck = false;
-            propagatedBuildInputs = with pkgs.ocamlPackages; [ yojson ];
-          });
 
-          lsp = buildDunePackage (basePackage // {
-            pname = "lsp";
+      lsp = buildDunePackage (basePackage
+        // {
+          pname = "lsp";
+          doCheck = false;
+          propagatedBuildInputs = with pkgs.ocamlPackages; [
+            jsonrpc
+            yojson
+            ppx_yojson_conv_lib
+            uutf
+          ];
+          checkInputs = let
+            p = pkgs.ocamlPackages;
+          in [
+            p.stdune
+            p.cinaps
+            p.base_quickcheck
+            p.ppx_expect
+            p.ppx_sexp_conv
+            p.ppx_yojson_conv
+            p.top-closure
+            (ocamlformat pkgs)
+          ];
+        });
+
+      ocaml-lsp = with pkgs.ocamlPackages;
+        buildDunePackage (basePackage
+          // {
+            pname = package;
             doCheck = false;
-            propagatedBuildInputs = with pkgs.ocamlPackages; [
-              jsonrpc
-              yojson
-              ppx_yojson_conv_lib
-              uutf
-            ];
-            checkInputs = let p = pkgs.ocamlPackages;
+            checkInputs = let
+              p = pkgs.ocamlPackages;
             in [
-              p.stdune
-              p.cinaps
               p.base_quickcheck
               p.ppx_expect
               p.ppx_sexp_conv
               p.ppx_yojson_conv
-              p.top-closure
               (ocamlformat pkgs)
             ];
+            buildInputs = [
+              jsonrpc
+              lsp
+              ocamlc-loc
+              astring
+              camlp-streams
+              dune-build-info
+              re
+              dune-rpc
+              chrome-trace
+              dyn
+              fiber
+              fs-io
+              xdg
+              ordering
+              spawn
+              csexp
+              ocamlformat-rpc-lib
+              stdune
+              yojson
+              ppx_yojson_conv_lib
+              merlin-lib
+              base
+            ];
+            propagatedBuildInputs = [];
+            buildPhase = ''
+              runHook preBuild
+              dune build ${package}.install --release ''${enableParallelBuilding:+-j $NIX_BUILD_CORES}
+              runHook postBuild
+            '';
+            meta = {mainProgram = "ocamllsp";};
           });
-
-          ocaml-lsp = with pkgs.ocamlPackages;
-            buildDunePackage (basePackage // {
-              pname = package;
-              doCheck = false;
-              checkInputs = let p = pkgs.ocamlPackages;
-              in [
-                p.base_quickcheck
-                p.ppx_expect
-                p.ppx_sexp_conv
-                p.ppx_yojson_conv
-                (ocamlformat pkgs)
-              ];
-              buildInputs = [
-                jsonrpc
-                lsp
-                ocamlc-loc
-                astring
-                camlp-streams
-                dune-build-info
-                re
-                dune-rpc
-                chrome-trace
-                dyn
-                fiber
-                fs-io
-                xdg
-                ordering
-                spawn
-                csexp
-                ocamlformat-rpc-lib
-                stdune
-                yojson
-                ppx_yojson_conv_lib
-                merlin-lib
-                base
-              ];
-              propagatedBuildInputs = [ ];
-              buildPhase = ''
-                runHook preBuild
-                dune build ${package}.install --release ''${enableParallelBuilding:+-j $NIX_BUILD_CORES}
-                runHook postBuild
-              '';
-              meta = { mainProgram = "ocamllsp"; };
-            });
+    };
+  in
+    {
+      overlays.default = final: prev: {
+        ocamlPackages =
+          prev.ocamlPackages.overrideScope
+          (oself: osuper: with oself; makeLocalPackages final);
+      };
+    }
+    // (flake-utils.lib.eachDefaultSystem (system: let
+      pkgsWithoutOverlays = import nixpkgs {inherit system;};
+      # The project uses Dune language 3.24, which is newer than the Dune in
+      # the current Nixpkgs snapshot.
+      duneLatest = pkgsWithoutOverlays.dune_3.overrideAttrs (_: {
+        version = "3.24.1";
+        src = pkgsWithoutOverlays.fetchurl {
+          url = "https://github.com/ocaml/dune/releases/download/3.24.1/dune-3.24.1.tbz";
+          hash = "sha256-Co6qYt/LlFgCvK+abyAmylIoMz7jkaG97dPnCj8m6iw=";
+        };
+      });
+      ocamlVersionOverlay = ocaml: _final: prev: {
+        ocamlPackages = prev.ocaml-ng.${ocaml}.overrideScope (_: _: {
+          dune = duneLatest;
+          dune_3 = duneLatest;
+        });
+      };
+      makeNixpkgs = ocaml: merlin:
+        pkgsWithoutOverlays.appendOverlays [
+          (ocamlVersionOverlay ocaml)
+          (overlay merlin)
+        ];
+      pkgs = makeNixpkgs "ocamlPackages_5_5" inputs.merlin;
+      localPackages = makeLocalPackages pkgs;
+      checkPkgs = pkgsWithoutOverlays.appendOverlays [
+        (ocamlVersionOverlay "ocamlPackages_5_5")
+      ];
+      checkPackages = makeLocalPackages checkPkgs;
+      devShell = localPackages: nixpkgs:
+        nixpkgs.mkShell {
+          buildInputs = [nixpkgs.ocamlPackages.utop];
+          inputsFrom =
+            builtins.map (x: x.overrideAttrs (p: n: {doCheck = true;}))
+            (builtins.attrValues localPackages);
         };
     in {
-      overlays.default = (final: prev: {
-        ocamlPackages = prev.ocamlPackages.overrideScope
-          (oself: osuper: with oself; makeLocalPackages final);
-      });
-    } // (flake-utils.lib.eachDefaultSystem (system:
-      let
-        pkgsWithoutOverlays = (import nixpkgs { inherit system; });
-        # The project uses Dune language 3.24, which is newer than the Dune in
-        # the current Nixpkgs snapshot.
-        duneLatest = pkgsWithoutOverlays.dune_3.overrideAttrs (_: {
-          version = "3.24.1";
-          src = pkgsWithoutOverlays.fetchurl {
-            url = "https://github.com/ocaml/dune/releases/download/3.24.1/dune-3.24.1.tbz";
-            hash = "sha256-Co6qYt/LlFgCvK+abyAmylIoMz7jkaG97dPnCj8m6iw=";
-          };
-        });
-        ocamlVersionOverlay = ocaml: _final: prev: {
-          ocamlPackages = prev.ocaml-ng.${ocaml}.overrideScope (_: _: {
-            dune = duneLatest;
-            dune_3 = duneLatest;
-          });
-        };
-        makeNixpkgs = ocaml: merlin:
-          pkgsWithoutOverlays.appendOverlays [
-            (ocamlVersionOverlay ocaml)
-            (overlay merlin)
-          ];
-        pkgs = makeNixpkgs "ocamlPackages_5_5" inputs.merlin;
-        localPackages = makeLocalPackages pkgs;
-        checkPkgs = pkgsWithoutOverlays.appendOverlays [
-          (ocamlVersionOverlay "ocamlPackages_5_5")
-        ];
-        checkPackages = makeLocalPackages checkPkgs;
-        devShell = localPackages: nixpkgs:
-          nixpkgs.mkShell {
-            buildInputs = [ nixpkgs.ocamlPackages.utop ];
-            inputsFrom =
-              builtins.map (x: x.overrideAttrs (p: n: { doCheck = true; }))
-              (builtins.attrValues localPackages);
-          };
-      in {
-        packages = (localPackages // {
+      packages =
+        localPackages
+        // {
           default = localPackages.ocaml-lsp;
+        };
+
+      checks = {
+        default = localPackages.ocaml-lsp;
+
+        nix-tests = checkPackages.ocaml-lsp.overrideAttrs (_: {
+          pname = "ocaml-lsp-nix-tests";
+          doCheck = true;
+          nativeCheckInputs = [(ocamlformat checkPkgs)];
+          checkPhase = ''
+              runHook preCheck
+            export HOME="$TMPDIR"
+            export TMPDIR=/tmp
+            make nix-tests
+            runHook postCheck
+          '';
         });
 
-        devShells = {
-          default = devShell localPackages pkgs;
-
-          release = pkgsWithoutOverlays.mkShell {
-            buildInputs = [ pkgsWithoutOverlays.dune-release ];
-          };
-
-          fmt = pkgsWithoutOverlays.mkShell {
-            buildInputs = [
-              # TODO: get rid of ocaml once dune get format without ocaml being
-              # present
-              pkgsWithoutOverlays.ocaml
-              (ocamlformat pkgsWithoutOverlays)
-              duneLatest
-            ];
-          };
-
-          check = checkPkgs.mkShell {
-            inputsFrom = builtins.attrValues checkPackages;
-            buildInputs = with checkPkgs.ocamlPackages; [
-              dune_3
-              base_quickcheck
-              ppx_expect
-              ppx_sexp_conv
-              (ocamlformat checkPkgs)
-            ];
-            # Keep Dune RPC Unix socket paths below the platform limit.
-            shellHook = ''
-              export TMPDIR=/tmp
-            '';
-          };
+        nix-fmt = pkgsWithoutOverlays.stdenv.mkDerivation {
+          pname = "ocaml-lsp-nix-fmt";
+          version = "n/a";
+          src = self;
+          nativeBuildInputs = [
+            pkgsWithoutOverlays.gnumake
+            pkgsWithoutOverlays.ocaml
+            duneLatest
+            (ocamlformat pkgsWithoutOverlays)
+          ];
+          buildPhase = ''
+            runHook preBuild
+            make nix-fmt
+            runHook postBuild
+          '';
+          installPhase = ''
+            touch $out
+          '';
         };
-      }));
+      };
+
+      devShells = {
+        default = devShell localPackages pkgs;
+
+        release = pkgsWithoutOverlays.mkShell {
+          buildInputs = [pkgsWithoutOverlays.dune-release];
+        };
+
+        fmt = pkgsWithoutOverlays.mkShell {
+          buildInputs = [
+            # TODO: get rid of ocaml once dune get format without ocaml being
+            # present
+            pkgsWithoutOverlays.ocaml
+            (ocamlformat pkgsWithoutOverlays)
+            duneLatest
+          ];
+        };
+
+        check = checkPkgs.mkShell {
+          inputsFrom = builtins.attrValues checkPackages;
+          buildInputs = with checkPkgs.ocamlPackages; [
+            dune_3
+            base_quickcheck
+            ppx_expect
+            ppx_sexp_conv
+            (ocamlformat checkPkgs)
+          ];
+          # Keep Dune RPC Unix socket paths below the platform limit.
+          shellHook = ''
+            export TMPDIR=/tmp
+          '';
+        };
+      };
+    }));
 }

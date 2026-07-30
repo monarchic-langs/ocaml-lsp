@@ -1,13 +1,11 @@
 name: Changelog check
 
 on:
-  pull_request:
-    branches: [master]
-    types: [opened, synchronize, reopened, labeled, unlabeled]
+  workflow_dispatch:
 
 jobs:
   Changelog-Entry-Check:
     name: Check Changelog Action
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.CI_RUNNER_LABELS) }}
     steps:
       - uses: tarides/changelog-check-action@v4
