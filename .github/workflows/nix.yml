@@ -3,7 +3,7 @@ name: Nix
 on:
   push:
     branches:
-      - master
+      - monarchic
   workflow_dispatch:
 
 jobs:

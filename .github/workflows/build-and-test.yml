@@ -3,7 +3,7 @@ name: Build and Test
 on:
   push:
     branches:
-      - master
+      - monarchic
   workflow_dispatch:
   schedule:
     # Prime the caches every Monday
