@@ -1,0 +1,14 @@
+name: Nix CI
+
+on:
+  push:
+    branches:
+      - monarchic
+  workflow_dispatch:
+
+jobs:
+  nix-ci:
+    uses: monarchic-langs/.github/.github/workflows/nix-ci.yml@main
+    with:
+      publish_cache: true
+    secrets: inherit
